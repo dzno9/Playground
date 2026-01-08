@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Read",
+      "Write",
+      "Edit"
+    ]
+  }
+}
