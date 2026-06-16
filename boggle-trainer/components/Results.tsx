@@ -1,19 +1,38 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { RoundResult } from '@/store/game';
 import type { Pattern } from '@/lib/board';
 import { scoreWord } from '@/lib/scoring';
+import { buildRoundRecord, saveRound } from '@/lib/history';
 import PatternGroups from './PatternGroups';
 
 interface Props {
   result: RoundResult;
   onNewGame: () => void;
   onPractice: (pattern: Pattern) => void;
+  onViewBlindSpots: () => void;
 }
 
-export default function Results({ result, onNewGame, onPractice }: Props) {
+export default function Results({ result, onNewGame, onPractice, onViewBlindSpots }: Props) {
   const { foundWords, missedWords, invalidWords, score, maxScore, patternGroups } = result;
   const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+  const savedRef = useRef(false);
+
+  // Save this round to localStorage exactly once when the results screen mounts
+  useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+    const record = buildRoundRecord({
+      board: result.board,
+      foundWords,
+      missedWords,
+      invalidWords,
+      score,
+      maxScore,
+    });
+    saveRound(record);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
@@ -39,27 +58,44 @@ export default function Results({ result, onNewGame, onPractice }: Props) {
         <WordList title="Invalid" words={invalidWords} color="red" />
       </div>
 
-      {/* Pattern groups (missed words only) */}
+      {/* Per-round pattern groups — suffix/prefix as secondary, not prescribed */}
       {patternGroups.length > 0 && (
         <PatternGroups groups={patternGroups} onPractice={onPractice} />
       )}
 
-      <button
-        onClick={onNewGame}
-        className="w-full py-3 bg-blue-500 text-white rounded-xl font-bold text-lg
-                   hover:bg-blue-600 transition-colors shadow-sm"
-      >
-        New game
-      </button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={onNewGame}
+          className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold text-lg
+                     hover:bg-blue-600 transition-colors shadow-sm cursor-pointer"
+        >
+          New game
+        </button>
+        <button
+          onClick={onViewBlindSpots}
+          className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-lg
+                     hover:bg-slate-200 transition-colors shadow-sm cursor-pointer"
+        >
+          My Blind Spots →
+        </button>
+      </div>
     </div>
   );
 }
 
-function WordList({ title, words, color }: { title: string; words: string[]; color: 'green' | 'amber' | 'red' }) {
+function WordList({
+  title,
+  words,
+  color,
+}: {
+  title: string;
+  words: string[];
+  color: 'green' | 'amber' | 'red';
+}) {
   const clr = {
     green: { card: 'border-green-200', header: 'text-green-700', badge: 'bg-green-100 text-green-800' },
     amber: { card: 'border-amber-200', header: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
-    red:   { card: 'border-red-200',   header: 'text-red-700',   badge: 'bg-red-100 text-red-700'   },
+    red:   { card: 'border-red-200',   header: 'text-red-700',   badge: 'bg-red-100   text-red-700'  },
   }[color];
 
   return (

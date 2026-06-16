@@ -1,7 +1,7 @@
-import type { Board, Pattern } from '@/lib/board';
+import type { Board } from '@/lib/board';
 import type { PatternGroup } from '@/lib/patterns';
 
-export type Phase = 'idle' | 'loading' | 'playing' | 'results' | 'practice';
+export type Phase = 'idle' | 'loading' | 'playing' | 'results' | 'practice' | 'analysis';
 
 export interface RoundResult {
   board: Board;
@@ -16,12 +16,15 @@ export interface RoundResult {
 export interface GameState {
   phase: Phase;
   board: Board;
-  timeLeft: number;       // seconds
-  foundWords: string[];   // valid words found this round (normalised lower)
-  invalidWords: string[]; // words entered that aren't on board or not in dict
+  timeLeft: number;
+  foundWords: string[];
+  invalidWords: string[];
   allValidWords: string[];
   result: RoundResult | null;
-  practicePattern: Pattern | null;
+  /** Human-readable label for what this practice session targets */
+  practiceLabel: string | null;
+  /** Optional hint shown on the board during practice (e.g. "look for extensions") */
+  practiceHint: string | null;
   loadError: string | null;
 }
 
@@ -35,7 +38,8 @@ export const initialState: GameState = {
   invalidWords: [],
   allValidWords: [],
   result: null,
-  practicePattern: null,
+  practiceLabel: null,
+  practiceHint: null,
   loadError: null,
 };
 
@@ -46,7 +50,8 @@ export type Action =
   | { type: 'SUBMIT_WORD'; word: string; valid: boolean; onBoard: boolean }
   | { type: 'TICK' }
   | { type: 'END_ROUND'; result: RoundResult }
-  | { type: 'START_PRACTICE'; pattern: Pattern; board: Board; allValidWords: string[] }
+  | { type: 'START_PRACTICE'; label: string; hint: string | null; board: Board; allValidWords: string[] }
+  | { type: 'SHOW_ANALYSIS' }
   | { type: 'RESET' };
 
 export function gameReducer(state: GameState, action: Action): GameState {
@@ -64,7 +69,8 @@ export function gameReducer(state: GameState, action: Action): GameState {
         invalidWords: [],
         timeLeft: ROUND_SECONDS,
         result: null,
-        practicePattern: null,
+        practiceLabel: null,
+        practiceHint: null,
       };
 
     case 'LOAD_ERROR':
@@ -72,7 +78,7 @@ export function gameReducer(state: GameState, action: Action): GameState {
 
     case 'SUBMIT_WORD': {
       const w = action.word.toLowerCase();
-      if (state.foundWords.includes(w)) return state; // already found
+      if (state.foundWords.includes(w)) return state;
       if (!action.valid || !action.onBoard) {
         if (state.invalidWords.includes(w)) return state;
         return { ...state, invalidWords: [...state.invalidWords, w] };
@@ -95,8 +101,13 @@ export function gameReducer(state: GameState, action: Action): GameState {
         foundWords: [],
         invalidWords: [],
         timeLeft: ROUND_SECONDS,
-        practicePattern: action.pattern,
+        practiceLabel: action.label,
+        practiceHint: action.hint,
+        result: null,
       };
+
+    case 'SHOW_ANALYSIS':
+      return { ...state, phase: 'analysis' };
 
     case 'RESET':
       return { ...initialState };

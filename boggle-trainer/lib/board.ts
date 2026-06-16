@@ -1,4 +1,6 @@
 export type Board = string[][];
+
+// Pattern is kept for per-round suffix/prefix labelling in PatternGroups
 export type Pattern =
   | 'short'
   | 'plural'
@@ -10,6 +12,12 @@ export type Pattern =
   | 'de'
   | 'in';
 
+// BoardBias controls board generation for practice mode
+export type BoardBias =
+  | { type: 'pattern'; pattern: Pattern }
+  | { type: 'start_letter'; letter: string }
+  | { type: 'none' };
+
 // Classic 4x4 Boggle dice (16 dice, each with 6 faces)
 const BOGGLE_DICE = [
   'AAEEGN', 'ABBBOO', 'ACHOPS', 'AFFKPS',
@@ -18,7 +26,7 @@ const BOGGLE_DICE = [
   'EIOSST', 'ELRTTY', 'HIMNQU', 'HLNNRZ',
 ];
 
-// Letters useful for each pattern (used in practice mode)
+// Letters to force onto dice for each pattern bias
 const PATTERN_LETTERS: Record<Pattern, string[]> = {
   short:  [],
   plural: ['S', 'S', 'S'],
@@ -44,18 +52,23 @@ function rollDie(faces: string): string {
   return faces[Math.floor(Math.random() * faces.length)];
 }
 
-export function generateBoard(biasPattern?: Pattern): Board {
+export function generateBoard(bias?: BoardBias): Board {
   let dice = shuffle([...BOGGLE_DICE]);
 
-  if (biasPattern && biasPattern !== 'short') {
-    const needed = PATTERN_LETTERS[biasPattern];
-    // Replace the letters on the first N dice to guarantee they include pattern letters
-    for (let i = 0; i < Math.min(needed.length, dice.length); i++) {
-      // Force this die to show the needed letter by injecting it
-      dice[i] = needed[i].repeat(6); // simple: whole die = that letter
+  if (bias && bias.type !== 'none') {
+    if (bias.type === 'pattern' && bias.pattern !== 'short') {
+      const needed = PATTERN_LETTERS[bias.pattern];
+      for (let i = 0; i < Math.min(needed.length, dice.length); i++) {
+        dice[i] = needed[i].repeat(6);
+      }
+      dice = shuffle(dice);
+    } else if (bias.type === 'start_letter') {
+      // Force 3 dice to always show the target letter
+      for (let i = 0; i < 3; i++) {
+        dice[i] = bias.letter.repeat(6);
+      }
+      dice = shuffle(dice);
     }
-    // Re-shuffle so forced letters aren't always in top-left
-    dice = shuffle(dice);
   }
 
   const letters = dice.map(rollDie);
@@ -65,4 +78,20 @@ export function generateBoard(biasPattern?: Pattern): Board {
     letters.slice(8, 12),
     letters.slice(12, 16),
   ];
+}
+
+/** Map a suffix string back to its Pattern for board biasing. */
+export function suffixToPattern(suffix: string): Pattern | null {
+  const MAP: Record<string, Pattern> = {
+    S: 'plural', ED: 'past', ER: 'er', ING: 'ing',
+  };
+  return MAP[suffix] ?? null;
+}
+
+/** Map a prefix string back to its Pattern for board biasing. */
+export function prefixToPattern(prefix: string): Pattern | null {
+  const MAP: Record<string, Pattern> = {
+    RE: 're', UN: 'un', DE: 'de', IN: 'in',
+  };
+  return MAP[prefix] ?? null;
 }
